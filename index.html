@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Factor F Calculator - Advanced Version</title>
+    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Sarabun', sans-serif; background-color: #f0f4f8; display: flex; justify-content: center; padding: 20px; }
+        .card { background: white; padding: 30px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.1); width: 100%; max-width: 600px; }
+        h2 { color: #0d47a1; text-align: center; margin-bottom: 5px; }
+        .subtitle { text-align: center; color: #666; font-size: 0.9em; margin-bottom: 25px; border-bottom: 1px solid #eee; padding-bottom: 15px; }
+        
+        .form-group { margin-bottom: 15px; }
+        label { font-weight: bold; display: block; margin-bottom: 8px; color: #333; }
+        select, input { width: 100%; padding: 12px; border: 1px solid #ccd1d9; border-radius: 8px; font-size: 16px; box-sizing: border-box; transition: 0.3s; }
+        select:focus, input:focus { border-color: #1a73e8; outline: none; box-shadow: 0 0 5px rgba(26,115,232,0.2); }
+        
+        .btn-calc { width: 100%; padding: 15px; background-color: #1a73e8; color: white; border: none; border-radius: 8px; font-size: 18px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .btn-calc:hover { background-color: #1557b0; }
+
+        .result-box { margin-top: 25px; padding: 20px; background-color: #fff; border: 2px solid #1a73e8; border-radius: 10px; display: none; }
+        .result-row { display: flex; justify-content: space-between; margin-bottom: 8px; padding-bottom: 5px; border-bottom: 1px dashed #eee; }
+        .final-val { font-size: 36px; color: #d32f2f; font-weight: bold; text-align: center; margin-top: 15px; }
+        
+        .action-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
+        .btn-copy { background-color: #2e7d32; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; }
+        .btn-print { background-color: #f9a825; color: white; border: none; padding: 10px; border-radius: 5px; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+<div class="card">
+    <h2>Factor F Calculator</h2>
+    <p class="subtitle">ระบบคำนวณอัตโนมัติ (ดอกเบี้ย 5%, ประกัน 10%, VAT 7%)</p>
+    
+    <div class="form-group">
+        <label>1. ประเภทงาน:</label>
+        <select id="workType" onchange="resetResult()">
+            <option value="road">งานทาง</option>
+            <option value="bridge">งานสะพานและท่อเหลี่ยม</option>
+            <option value="irrigation">งานชลประทาน</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>2. เงินล่วงหน้าจ่าย (Advance):</label>
+        <select id="advance" onchange="resetResult()">
+            <option value="0">0%</option>
+            <option value="5">5%</option>
+            <option value="10">10%</option>
+            <option value="15" selected>15%</option>
+        </select>
+    </div>
+
+    <div class="form-group">
+        <label>3. ค่างานต้นทุน (A):</label>
+        <input type="number" id="costA" placeholder="กรอกตัวเลข เช่น 8374254.61">
+    </div>
+    
+    <button class="btn-calc" onclick="calculate()">คำนวณค่า Factor F</button>
+
+    <div id="resultArea" class="result-box">
+        <div class="result-row"><strong>เงื่อนไข:</strong> <span id="summaryText"></span></div>
+        <div class="result-row"><span>ต้นทุนที่ใช้หา (A):</span> <span id="outA"></span></div>
+        <div class="result-row"><span>ช่วงต่ำ-สูง (B-C):</span> <span id="outRange"></span></div>
+        <div class="result-row"><span>ค่า F ตัวต่ำ-สูง (D-E):</span> <span id="outFParams"></span></div>
+        <div style="text-align:center; margin-top:10px; font-weight:bold;">ค่า Factor F ที่คำนวณได้:</div>
+        <div class="final-val" id="finalF"></div>
+
+        <div class="action-btns">
+            <button class="btn-copy" onclick="copyResult()">คัดลอกข้อมูล</button>
+            <button class="btn-print" onclick="window.print()">พิมพ์ / เซฟ PDF</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ข้อมูลสมมติ (กรุณาปรับตัวเลขให้ตรงกับตารางประกาศล่าสุดของหน่วยงานคุณ)
+const factorData = {
+    road: {
+        "15": [{c:5e6, f:1.3616}, {c:1e7, f:1.3105}, {c:2e7, f:1.3005}, {c:5e7, f:1.2915}],
+        "10": [{c:5e6, f:1.3640}, {c:1e7, f:1.3130}, {c:2e7, f:1.3030}, {c:5e7, f:1.2940}],
+        "5":  [{c:5e6, f:1.3665}, {c:1e7, f:1.3155}, {c:2e7, f:1.3055}, {c:5e7, f:1.2965}],
+        "0":  [{c:5e6, f:1.3690}, {c:1e7, f:1.3180}, {c:2e7, f:1.3080}, {c:5e7, f:1.2990}]
+    },
+    bridge: {
+        "15": [{c:5e6, f:1.3161}, {c:1e7, f:1.2801}, {c:2e7, f:1.2701}, {c:5e7, f:1.2415}],
+        "10": [{c:5e6, f:1.3185}, {c:1e7, f:1.2825}, {c:2e7, f:1.2725}, {c:5e7, f:1.2440}],
+        "5":  [{c:5e6, f:1.3210}, {c:1e7, f:1.2850}, {c:2e7, f:1.2750}, {c:5e7, f:1.2465}],
+        "0":  [{c:5e6, f:1.3235}, {c:1e7, f:1.2875}, {c:2e7, f:1.2775}, {c:5e7, f:1.2490}]
+    },
+    irrigation: {
+        "15": [{c:5e6, f:1.4055}, {c:1e7, f:1.3851}, {c:2e7, f:1.3751}, {c:5e7, f:1.3524}],
+        "10": [{c:5e6, f:1.4080}, {c:1e7, f:1.3875}, {c:2e7, f:1.3775}, {c:5e7, f:1.3550}],
+        "5":  [{c:5e6, f:1.4105}, {c:1e7, f:1.3900}, {c:2e7, f:1.3800}, {c:5e7, f:1.3575}],
+        "0":  [{c:5e6, f:1.4130}, {c:1e7, f:1.3925}, {c:2e7, f:1.3825}, {c:5e7, f:1.3600}]
+    }
+};
+
+function calculate() {
+    const A = parseFloat(document.getElementById('costA').value);
+    const type = document.getElementById('workType').value;
+    const adv = document.getElementById('advance').value;
+    const table = factorData[type][adv];
+
+    if (!A) { alert("กรุณาระบุค่างานต้นทุน"); return; }
+
+    let B, C, D, E;
+    if (A <= table[0].c) { B = C = table[0].c; D = E = table[0].f; }
+    else if (A >= table[table.length-1].c) { B = C = table[table.length-1].c; D = E = table[table.length-1].f; }
+    else {
+        for (let i = 0; i < table.length - 1; i++) {
+            if (A >= table[i].c && A <= table[i+1].c) {
+                B = table[i].c; D = table[i].f;
+                C = table[i+1].c; E = table[i+1].f;
+                break;
+            }
+        }
+    }
+
+    const resultF = (B === C) ? D : D - (((D - E) * (A - B)) / (C - B));
+
+    document.getElementById('summaryText').innerText = `${document.getElementById('workType').selectedOptions[0].text} (ล่วงหน้า ${adv}%)`;
+    document.getElementById('outA').innerText = A.toLocaleString(undefined, {minimumFractionDigits: 2});
+    document.getElementById('outRange').innerText = `${B.toLocaleString()} - ${C.toLocaleString()}`;
+    document.getElementById('outFParams').innerText = `${D.toFixed(4)} - ${E.toFixed(4)}`;
+    document.getElementById('finalF').innerText = resultF.toFixed(4);
+    document.getElementById('resultArea').style.display = 'block';
+}
+
+function resetResult() { document.getElementById('resultArea').style.display = 'none'; }
+
+function copyResult() {
+    const summary = document.getElementById('summaryText').innerText;
+    const val = document.getElementById('finalF').innerText;
+    const text = `ผลคำนวณ Factor F\n${summary}\nค่างานต้นทุน: ${document.getElementById('outA').innerText} บาท\nค่า Factor F: ${val}`;
+    navigator.clipboard.writeText(text);
+    alert("คัดลอกลงคลิปบอร์ดแล้ว!");
+}
+</script>
+
+</body>
+</html>
