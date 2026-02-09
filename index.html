@@ -1,176 +1,182 @@
-<!DOCTYPE html>
-<html lang="th">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Factor F Calculator - Professional Edit</title>
-    <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@300;400;700&display=swap" rel="stylesheet">
+import streamlit as st
+import pandas as pd
+from datetime import datetime
+import io
+
+# 1. ตั้งค่าหน้าจอ
+st.set_page_config(page_title="ระบบควบคุมวัสดุ Pro V.2", layout="wide")
+
+# CSS: ตกแต่ง UI ทั้งหมด
+st.markdown("""
     <style>
-        :root { --primary: #1a73e8; --secondary: #5f6368; --success: #2e7d32; }
-        body { font-family: 'Sarabun', sans-serif; background-color: #f8f9fa; display: flex; justify-content: center; padding: 20px; color: #3c4043; }
-        .card { background: white; padding: 30px; border-radius: 12px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); width: 100%; max-width: 650px; }
-        h2 { color: var(--primary); text-align: center; margin-bottom: 5px; }
-        .subtitle { text-align: center; color: var(--secondary); font-size: 0.85em; margin-bottom: 20px; }
-        
-        /* Layout */
-        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; margin-bottom: 15px; }
-        .form-group { margin-bottom: 15px; }
-        label { font-weight: bold; display: block; margin-bottom: 5px; font-size: 0.9em; }
-        select, input { width: 100%; padding: 10px; border: 1px solid #dadce0; border-radius: 6px; font-size: 15px; box-sizing: border-box; }
-        
-        /* Result Styling */
-        .result-box { margin-top: 25px; padding: 20px; border: 2px solid var(--primary); border-radius: 10px; background: #fff; display: none; }
-        .final-val { font-size: 42px; color: #d93025; font-weight: bold; text-align: center; margin: 10px 0; }
-        
-        .btn-main { width: 100%; padding: 15px; background: var(--primary); color: white; border: none; border-radius: 6px; font-size: 18px; font-weight: bold; cursor: pointer; }
-        .action-btns { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 15px; }
-        .btn-sub { padding: 10px; border: 1px solid #dadce0; border-radius: 5px; cursor: pointer; font-family: inherit; }
+    @import url('https://fonts.googleapis.com/css2?family=Sarabun:wght@400;700&display=swap');
+    html, body, [class*="css"] { 
+        font-family: 'Sarabun', sans-serif; 
+        background-color: #ffffff !important; 
+    }
+    [data-testid="column"] { display: flex; align-items: flex-end; }
+    
+    .stTextInput input, .stNumberInput input, .stSelectbox div[data-baseweb="select"] {
+        font-size: 18px !important;
+        font-weight: bold !important;
+        background-color: #f2f2f2 !important; 
+        border: 2px solid #000000 !important; 
+        border-radius: 8px !important;
+    }
+    
+    ::placeholder { color: #aaaaaa !important; opacity: 1; }
 
-        @media print { .no-print { display: none; } .card { box-shadow: none; width: 100%; } .result-box { display: block !important; } }
+    .stTable { width: 100%; border: 1px solid #000; }
+    .stTable th { text-align: center !important; background-color: #f2f2f2 !important; border: 1px solid #000 !important; }
+    .stTable td { text-align: center !important; vertical-align: middle !important; border: 1px solid #ddd !important; }
+
+    div.stButton > button {
+        width: 100%; height: 3.0rem; border-radius: 8px !important;
+        background-color: #007bff; color: white; border: 1px solid #000; font-weight: bold;
+    }
+    
+    .ref-box {
+        background-color: #e9ecef; 
+        padding: 15px; 
+        border-radius: 8px; 
+        border-left: 6px solid #007bff; 
+        margin-bottom: 25px;
+    }
+    
+    .stExpander { border: 2px solid #000000 !important; background-color: #ffffff !important; border-radius: 10px !important; }
     </style>
-</head>
-<body>
+""", unsafe_allow_html=True)
 
-<div class="card">
-    <div class="no-print">
-        <h2>Factor F Calculator</h2>
-        <p class="subtitle">คำนวณค่า Factor F ตามเกณฑ์ราคากลางงานก่อสร้าง</p>
+@st.cache_data
+def load_data():
+    file_name = "ตารางคำนวณอัตราราคางานคอนกรีตและหิน-กรมบัญชีกลาง3.csv"
+    for enc in ['cp874', 'tis-620', 'utf-8-sig']:
+        try:
+            df = pd.read_csv(file_name, skiprows=2, header=None, encoding=enc, on_bad_lines='skip', low_memory=False)
+            return df
+        except:
+            continue
+    return None
 
-        <div class="grid-3">
-            <div class="form-group">
-                <label>เงินล่วงหน้า (%)</label>
-                <select id="advance">
-                    <option value="0">0%</option>
-                    <option value="5">5%</option>
-                    <option value="10">10%</option>
-                    <option value="15" selected>15%</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>เงินประกัน (%)</label>
-                <input type="number" id="retention" value="10">
-            </div>
-            <div class="form-group">
-                <label>ดอกเบี้ยกู้ (%)</label>
-                <input type="number" id="interest" value="5">
-            </div>
-        </div>
+def to_excel(df_detailed, df_summary):
+    output = io.BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        df_summary.to_excel(writer, sheet_name='สรุปภาพรวม', index=False)
+        df_detailed.to_excel(writer, sheet_name='รายการงานย่อย', index=False)
+    return output.getvalue()
 
-        <div class="grid-3">
-            <div class="form-group" style="grid-column: span 2;">
-                <label>ประเภทงาน</label>
-                <select id="workType">
-                    <option value="road">งานทาง</option>
-                    <option value="bridge">งานสะพานและท่อเหลี่ยม</option>
-                    <option value="irrigation">งานชลประทาน</option>
-                </select>
-            </div>
-            <div class="form-group">
-                <label>VAT (%)</label>
-                <input type="number" id="vat" value="7">
-            </div>
-        </div>
+# บรรทัดที่ 72: แก้ไขโครงสร้าง Session State
+if 'calc_history' not in st.session_state:
+    st.session_state.calc_history = []
 
-        <div class="form-group">
-            <label>ค่างานต้นทุน (A) - บาท</label>
-            <input type="number" id="costA" placeholder="ระบุค่างาน เช่น 8374254.61">
-        </div>
+st.markdown("<h1>🏗️ ตารางคำนวณอัตราราคางานคอนกรีตและหิน</h1>", unsafe_allow_html=True)
 
-        <button class="btn-main" onclick="calculate()">คำนวณค่า Factor F</button>
+st.markdown("""
+    <div class="ref-box">
+        📖 <b>เอกสารอ้างอิง:</b> 
+        <a href="https://drive.google.com/file/d/1ibHbb81wjwqaDa3ab-VsDDwR-qvUx5FM/view" target="_blank" style="text-decoration: none; color: #007bff; font-weight: bold;">
+            หลักเกณฑ์การคำนวณราคากลางงานก่อสร้างชลประทาน (ตุลาคม 2560)
+        </a>
+        <br><small><i>*อ้างอิงตามบัญชีท้ายหลักเกณฑ์ฯ หน้า 215 "ตารางคำนวณอัตราราคางานคอนกรีตและหิน"</i></small>
     </div>
+""", unsafe_allow_html=True)
 
-    <div id="resultArea" class="result-box">
-        <h3 style="text-align:center; margin-top:0;">ผลการคำนวณ</h3>
-        <div style="display: grid; grid-template-columns: 1fr 1fr; font-size: 0.9em;">
-            <p><b>ประเภทงาน:</b> <span id="resWork"></span></p>
-            <p><b>เงินล่วงหน้า:</b> <span id="resAdv"></span>%</p>
-            <p><b>เงินประกัน:</b> <span id="resRet"></span>%</p>
-            <p><b>ดอกเบี้ย:</b> <span id="resInt"></span>%</p>
-            <p><b>VAT:</b> <span id="resVat"></span>%</p>
-            <p><b>ต้นทุน (A):</b> <span id="resA"></span></p>
-        </div>
-        <hr>
-        <div class="final-val" id="finalF">1.0000</div>
-        <div style="text-align:center; color: #666; font-size: 0.8em;">(ใช้สำหรับการคูณกับค่างานต้นทุนเพื่อหาค่างานสุทธิ)</div>
+try:
+    df = load_data()
+    if df is not None:
+        col_p1, col_p2 = st.columns(2)
+        office_name = col_p1.text_input("🏢 สำนัก/โครงการ:", placeholder="ระบุหน่วยงาน...")
+        project_work_name = col_p2.text_input("📄 ชื่องานโครงการ:", placeholder="ระบุชื่องาน...")
         
-        <div class="action-btns no-print">
-            <button class="btn-sub" onclick="copyResult()">คัดลอกข้อความ</button>
-            <button class="btn-sub" onclick="window.print()">พิมพ์เอกสาร / PDF</button>
-        </div>
-    </div>
-</div>
+        p_names = ["หินใหญ่(ลบ.ม.)", "หินย่อย(ลบ.ม.)", "ทรายหยาบ(ลบ.ม.)", "ปูนซีเมนต์(ถุง)", "หินคลุก(ลบ.ม.)", "เหล็กเส้น(ตัน)", "ลวดผูกเหล็ก(กก.)"]
 
-<script>
-// หมายเหตุ: ในทางปฏิบัติ ค่า Factor F จะเปลี่ยนตาม Interest และ Retention ด้วย 
-// ในโค้ดนี้จะใช้ฐานข้อมูลจากตารางมาตรฐาน (Interest 5, Retention 10) เป็นหลัก
-// หากค่าเหล่านี้เปลี่ยนไป "อย่างมีนัยสำคัญ" ผู้ใช้ควรปรับตารางข้อมูลใน factorData
-const factorData = {
-    road: {
-        "15": [{c:5e6, f:1.3616}, {c:1e7, f:1.3105}, {c:2e7, f:1.3005}, {c:5e7, f:1.2915}],
-        "10": [{c:5e6, f:1.3640}, {c:1e7, f:1.3130}, {c:2e7, f:1.3030}, {c:5e7, f:1.2940}],
-        "5":  [{c:5e6, f:1.3665}, {c:1e7, f:1.3155}, {c:2e7, f:1.3055}, {c:5e7, f:1.2965}],
-        "0":  [{c:5e6, f:1.3690}, {c:1e7, f:1.3180}, {c:2e7, f:1.3080}, {c:5e7, f:1.2990}]
-    },
-    bridge: {
-        "15": [{c:5e6, f:1.3161}, {c:1e7, f:1.2801}, {c:2e7, f:1.2701}, {c:5e7, f:1.2415}],
-        "10": [{c:5e6, f:1.3185}, {c:1e7, f:1.2825}, {c:2e7, f:1.2725}, {c:5e7, f:1.2440}],
-        "5":  [{c:5e6, f:1.3210}, {c:1e7, f:1.2850}, {c:2e7, f:1.2750}, {c:5e7, f:1.2465}],
-        "0":  [{c:5e6, f:1.3235}, {c:1e7, f:1.2875}, {c:2e7, f:1.2775}, {c:5e7, f:1.2490}]
-    },
-    irrigation: {
-        "15": [{c:5e6, f:1.4055}, {c:1e7, f:1.3851}, {c:2e7, f:1.3751}, {c:5e7, f:1.3524}],
-        "10": [{c:5e6, f:1.4080}, {c:1e7, f:1.3875}, {c:2e7, f:1.3775}, {c:5e7, f:1.3550}],
-        "5":  [{c:5e6, f:1.4105}, {c:1e7, f:1.3900}, {c:2e7, f:1.3800}, {c:5e7, f:1.3575}],
-        "0":  [{c:5e6, f:1.4130}, {c:1e7, f:1.3925}, {c:2e7, f:1.3825}, {c:5e7, f:1.3600}]
-    }
-};
+        st.markdown("### 📊 1. ปริมาณตามแผน (Planned)")
+        with st.expander("📝 ระบุปริมาณวัสดุที่ได้รับอนุมัติ (คลิกเพื่อกรอก)", expanded=True):
+            col_plan = st.columns(4) 
+            planned_values = {}
+            for i, name in enumerate(p_names):
+                val = col_plan[i % 4].number_input(
+                    f"{name}", min_value=0.0, value=None, placeholder="0.00", format="%.2f", key=f"p_{i}"
+                )
+                planned_values[name] = round(val, 2) if val is not None else 0.0
 
-function calculate() {
-    const A = parseFloat(document.getElementById('costA').value);
-    const type = document.getElementById('workType').value;
-    const adv = document.getElementById('advance').value;
-    const vat = parseFloat(document.getElementById('vat').value);
-    
-    if (!A) { alert("กรุณากรอกค่างานต้นทุน"); return; }
+        st.divider()
 
-    const table = factorData[type][adv];
-    let B, C, D, E;
+        st.markdown("### ➕ 2. รายการงานก่อสร้าง (Actual)")
+        col_in1, col_in2, col_in3 = st.columns([2.5, 1, 1]) 
+        work_list = df[0].dropna().unique().tolist()
+        selected_work = col_in1.selectbox("เลือกประเภทงาน:", work_list)
+        q_val_input = col_in2.number_input(
+            "ปริมาณงานที่ทำจริง:", min_value=0.0, value=None, placeholder="0.00", format="%.2f", key="work_qty"
+        )
+        q_val = q_val_input if q_val_input is not None else 0.0
+        
+        if col_in3.button("➕ เพิ่มรายการ", use_container_width=True):
+            if q_val > 0:
+                selected_row = df[df[0] == selected_work].iloc[0]
+                m_idx_map = {p_names[0]: 2, p_names[1]: 4, p_names[2]: 6, p_names[3]: 8, p_names[4]: 10, p_names[5]: 12, p_names[6]: 14}
+                temp_details = {}
+                unit_ratios = {}
+                for m_name, idx in m_idx_map.items():
+                    if idx < len(selected_row):
+                        try:
+                            val_str = str(selected_row[idx]).replace(',', '').strip()
+                            if val_str and val_str not in ["nan", "-"]:
+                                ratio = float(val_str)
+                                unit_ratios[m_name] = ratio
+                                temp_details[m_name] = round(ratio * q_val, 2)
+                        except:
+                            continue
+                st.session_state.calc_history.append({
+                    "ประเภทงาน": selected_work, "ปริมาณงาน": round(q_val, 2), 
+                    "เกณฑ์ต่อหน่วย": unit_ratios, "รายละเอียด": temp_details
+                })
+                st.rerun()
 
-    if (A <= table[0].c) { B = C = table[0].c; D = E = table[0].f; }
-    else if (A >= table[table.length-1].c) { B = C = table[table.length-1].c; D = E = table[table.length-1].f; }
-    else {
-        for (let i = 0; i < table.length - 1; i++) {
-            if (A >= table[i].c && A <= table[i+1].c) {
-                B = table[i].c; D = table[i].f;
-                C = table[i+1].c; E = table[i+1].f;
-                break;
-            }
-        }
-    }
+        if st.session_state.calc_history:
+            st.markdown("### 📋 3. รายละเอียดการคำนวณแต่ละรายการ")
+            for i, item in enumerate(st.session_state.calc_history):
+                ratios = item.get('เกณฑ์ต่อหน่วย', {})
+                with st.expander(f"🔹 {item['ประเภทงาน']} (จำนวน {item['ปริมาณงาน']:,} หน่วย)"):
+                    if ratios:
+                        calc_table = []
+                        for m_n in p_names:
+                            if m_n in ratios:
+                                calc_table.append({
+                                    "รายการวัสดุ": m_n,
+                                    "เกณฑ์ต่อหน่วย (A)": f"{ratios[m_n]:,.3f}",
+                                    "ปริมาณงานจริง (B)": f"{item['ปริมาณงาน']:,.2f}",
+                                    "รวมวัสดุที่ต้องใช้ (A x B)": f"{item['รายละเอียด'].get(m_n, 0):,.2f}"
+                                })
+                        st.table(pd.DataFrame(calc_table))
+                    
+                    if st.button(f"🗑️ ลบรายการ", key=f"del_{i}"):
+                        st.session_state.calc_history.pop(i)
+                        st.rerun()
 
-    let resultF = (B === C) ? D : D - (((D - E) * (A - B)) / (C - B));
-    
-    // ปรับค่าตาม VAT หากไม่ใช่ 7% (สูตรโดยประมาณ: F_new = F_old * (1+Vat_new)/(1+0.07))
-    if (vat !== 7) {
-        resultF = resultF * (1 + (vat/100)) / 1.07;
-    }
+            st.divider()
+            
+            st.markdown("### 📊 4. สรุปยอดรวมวัสดุสะสมเปรียบเทียบแผนงาน")
+            totals = {k: round(sum(item['รายละเอียด'].get(k, 0.0) for item in st.session_state.calc_history), 2) for k in p_names}
+            
+            df_comp = pd.DataFrame([{
+                "รายการวัสดุ": name,
+                "แผนงาน (Planned)": f"{planned_values[name]:,.2f}",
+                "คำนวณจริง (Actual)": f"{totals[name]:,.2f}",
+                "ส่วนต่าง (+เหลือ/-เกิน)": f"{(planned_values[name] - totals[name]):,.2f}",
+                "สถานะ": "✅ ปกติ" if (planned_values[name] - totals[name]) >= 0 else "⚠️ เกินแผน"
+            } for name in p_names])
+            st.table(df_comp)
 
-    document.getElementById('resWork').innerText = document.getElementById('workType').selectedOptions[0].text;
-    document.getElementById('resAdv').innerText = adv;
-    document.getElementById('resRet').innerText = document.getElementById('retention').value;
-    document.getElementById('resInt').innerText = document.getElementById('interest').value;
-    document.getElementById('resVat').innerText = vat;
-    document.getElementById('resA').innerText = A.toLocaleString();
-    document.getElementById('finalF').innerText = resultF.toFixed(4);
-    document.getElementById('resultArea').style.display = 'block';
-}
-
-function copyResult() {
-    const f = document.getElementById('finalF').innerText;
-    const a = document.getElementById('resA').innerText;
-    navigator.clipboard.writeText(`ค่างานต้นทุน: ${a} บาท, Factor F: ${f}`);
-    alert("คัดลอกข้อมูลแล้ว");
-}
-</script>
-</body>
-</html>
+            col_dl1, col_dl2 = st.columns(2)
+            df_detailed_ex = pd.DataFrame([{"งาน": i['ประเภทงาน'], "จำนวน": i['ปริมาณงาน'], **i['รายละเอียด']} for i in st.session_state.calc_history])
+            excel_data = to_excel(df_detailed_ex, df_comp)
+            
+            col_dl1.download_button(label="📥 ดาวน์โหลดไฟล์ Excel", data=excel_data, file_name=f'Report_{datetime.now().strftime("%Y%m%d")}.xlsx', use_container_width=True)
+            if col_dl2.button("🚫 ล้างข้อมูลทั้งหมด"):
+                st.session_state.calc_history = []
+                st.rerun()
+    else:
+        st.error("❌ ไม่พบไฟล์ CSV")
+except Exception as e:
+    st.error(f"⚠️ เกิดข้อผิดพลาด: {str(e)}")
