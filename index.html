@@ -54,8 +54,8 @@
                 <label>พื้นที่ฝนตกชุก</label>
                 <select id="rainType">
                     <option value="normal">พื้นที่ปกติ</option>
-                    <option value="rain1">ฝนตกชุก 1 </option>
-                    <option value="rain2">ฝนตกชุก 2 </option>
+                    <option value="rain1">ฝนตกชุก 1 (ฝั่งอ่าวไทย)</option>
+                    <option value="rain2">ฝนตกชุก 2 (ฝั่งอันดามัน)</option>
                 </select>
             </div>
         </div>
@@ -142,4 +142,10 @@ function calculate() {
 }
 
 function copyResult() {
-    const text = `ผลคำนวณ Factor F (เงื่อนไข 15,
+    const text = `ผลคำนวณ Factor F (เงื่อนไข 15,10,7,7)\nประเภท: ${document.getElementById('resType').innerText}\nต้นทุน: ${document.getElementById('resA').innerText}\nFactor F: ${document.getElementById('finalF').innerText}`;
+    navigator.clipboard.writeText(text);
+    alert("คัดลอกข้อมูลเรียบร้อย!");
+}
+</script>
+</body>
+</html>
